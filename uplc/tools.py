@@ -14,6 +14,7 @@ from .cost_model import (
 )
 from .lexer import strip_comments, Lexer
 from .optimizer.deduplicate import Deduplicate
+from .optimizer.inline_variables import InlineVariableOptimizer
 from .optimizer.pre_apply_args import ApplyLambdaTransformer
 from .optimizer.pre_evaluation import PreEvaluationOptimizer
 from .optimizer.remove_force_delay import ForceDelayRemover
@@ -150,6 +151,11 @@ def compile(
             (
                 Deduplicate()
                 if config.unique_variable_names and config.deduplicate is not None
+                else NoOp()
+            ),
+            (
+                InlineVariableOptimizer()
+                if config.unique_variable_names and config.inline_variables
                 else NoOp()
             ),
         ]:

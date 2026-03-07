@@ -10,6 +10,7 @@ class CompilationConfig:
     remove_force_delay: Optional[bool] = None
     fold_apply_lambda_increase: Optional[Union[int, float]] = None
     deduplicate: Optional[bool] = None
+    inline_variables: Optional[bool] = None
 
     def update(
         self, other: Optional["CompilationConfig"] = None, **kwargs
@@ -34,7 +35,7 @@ OPT_O2_CONFIG = OPT_O1_CONFIG.update(
     constant_folding_keep_traces=True,
 )
 OPT_O3_CONFIG = OPT_O2_CONFIG.update(
-    deduplicate=True, constant_folding_keep_traces=False
+    deduplicate=True, constant_folding_keep_traces=False, inline_variables=True
 )
 OPT_CONFIGS = [OPT_O0_CONFIG, OPT_O1_CONFIG, OPT_O2_CONFIG, OPT_O3_CONFIG]
 
@@ -64,6 +65,10 @@ ARGPARSE_ARGS = {
     "deduplicate": {
         "__alts__": ["--dedup"],
         "help": "Deduplicate identical subterms by introducing a let-binding. This reduces size but may increase runtime slightly.",
+    },
+    "inline_variables": {
+        "__alts__": ["--iv"],
+        "help": "Inline variables that are used exactly once in a position guaranteed to be executed. This may increase size but reduces runtime.",
     },
 }
 for k in ARGPARSE_ARGS:
