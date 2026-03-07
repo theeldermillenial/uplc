@@ -1532,14 +1532,12 @@ class MiscTest(unittest.TestCase):
         )
 
     def test_parse(self):
-        p = parse(
-            """
+        p = parse("""
 (program
   1.0.0
   [ [ [ (force (delay [(lam i_0 (con integer 2)) (con bytestring #02)])) (builtin addInteger) ] (error) ] (con pair<list<integer>,unit> [[],()]) ]
 )
-        """
-        )
+        """)
         print(dumps(p))
 
     @parameterized.expand(
@@ -1748,7 +1746,9 @@ class MiscTest(unittest.TestCase):
         p = UniqueVariableTransformer().visit(p)
         before = p.dumps()
         p_after = InlineVariableOptimizer().visit(p)
-        self.assertEqual(before, p_after.dumps(), "Double-use variable should NOT be inlined")
+        self.assertEqual(
+            before, p_after.dumps(), "Double-use variable should NOT be inlined"
+        )
 
     def test_inline_variables_not_inlined_inside_delay(self):
         """Variable used inside Delay is NOT inlined (not guaranteed)."""
@@ -1766,7 +1766,9 @@ class MiscTest(unittest.TestCase):
         p = UniqueVariableTransformer().visit(p)
         before = p.dumps()
         p_after = InlineVariableOptimizer().visit(p)
-        self.assertEqual(before, p_after.dumps(), "Variable inside Delay should NOT be inlined")
+        self.assertEqual(
+            before, p_after.dumps(), "Variable inside Delay should NOT be inlined"
+        )
 
     def test_inline_variables_not_inlined_inside_lambda(self):
         """Variable used only inside a nested Lambda body is NOT inlined."""
@@ -1784,7 +1786,9 @@ class MiscTest(unittest.TestCase):
         p = UniqueVariableTransformer().visit(p)
         before = p.dumps()
         p_after = InlineVariableOptimizer().visit(p)
-        self.assertEqual(before, p_after.dumps(), "Variable inside Lambda body should NOT be inlined")
+        self.assertEqual(
+            before, p_after.dumps(), "Variable inside Lambda body should NOT be inlined"
+        )
 
     def test_inline_variables_o3_preserves_semantics(self):
         """O3 compilation with inline_variables produces the same results as O0."""
@@ -1828,7 +1832,6 @@ class MiscTest(unittest.TestCase):
             GuaranteedExecutionChecker("x").visit(body),
             "x inside Case branch should NOT be in guaranteed position",
         )
-
 
     def test_compiler_options(self):
         with open("examples/fibonacci.uplc", "r") as f:

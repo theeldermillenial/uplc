@@ -666,12 +666,8 @@ class HypothesisTests(unittest.TestCase):
             "(program 1.0.0 [(lam x [(builtin addInteger) x (con integer 1)]) (con integer 10)])"
         )
     )
-    @hypothesis.example(
-        parse("(program 1.0.0 [(lam x (lam y x)) (con integer 0)])")
-    )
-    @hypothesis.example(
-        parse("(program 1.0.0 [(lam x (delay x)) (con integer 0)])")
-    )
+    @hypothesis.example(parse("(program 1.0.0 [(lam x (lam y x)) (con integer 0)])"))
+    @hypothesis.example(parse("(program 1.0.0 [(lam x (delay x)) (con integer 0)])"))
     def test_inline_variables_no_semantic_change(self, p):
         code = dumps(p)
         orig_p = parse(code).term
