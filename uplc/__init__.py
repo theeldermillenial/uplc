@@ -3,7 +3,6 @@
 import importlib.metadata
 import logging
 
-
 __version__ = importlib.metadata.version(__package__ or __name__)
 __author__ = "nielstron"
 __author_email__ = "niels@opshin.dev"
