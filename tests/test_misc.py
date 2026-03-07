@@ -1532,14 +1532,12 @@ class MiscTest(unittest.TestCase):
         )
 
     def test_parse(self):
-        p = parse(
-            """
+        p = parse("""
 (program
   1.0.0
   [ [ [ (force (delay [(lam i_0 (con integer 2)) (con bytestring #02)])) (builtin addInteger) ] (error) ] (con pair<list<integer>,unit> [[],()]) ]
 )
-        """
-        )
+        """)
         print(dumps(p))
 
     @parameterized.expand(
@@ -1833,6 +1831,57 @@ class MiscTest(unittest.TestCase):
         self.assertFalse(
             GuaranteedExecutionChecker("x").visit(body),
             "x inside Case branch should NOT be in guaranteed position",
+        )
+
+    def test_inline_variables_constr_field_guaranteed(self):
+        """Variable inside a Constr field is in a guaranteed position."""
+        from uplc.optimizer.inline_variables import (
+            GuaranteedExecutionChecker,
+            InlineVariableOptimizer,
+        )
+        from uplc.transformer.unique_variables import UniqueVariableTransformer
+
+        # GuaranteedExecutionChecker: x inside Constr fields should be guaranteed
+        body = Constr(0, [Variable("x"), BuiltinInteger(1)])
+        self.assertTrue(
+            GuaranteedExecutionChecker("x").visit(body),
+            "x inside Constr fields should be in guaranteed position",
+        )
+
+        # Also verify the optimizer actually inlines through a Constr field
+        # [(lam x (constr 0 x (con integer 1))) (con integer 5)]
+        p = Program(
+            (1, 0, 0),
+            Apply(
+                Lambda("x", Constr(0, [Variable("x"), BuiltinInteger(1)])),
+                BuiltinInteger(5),
+            ),
+        )
+        p = UniqueVariableTransformer().visit(p)
+        p_inlined = InlineVariableOptimizer().visit(p)
+        # After inlining, Apply(Lambda, val) is replaced by the Constr directly
+        self.assertIsInstance(
+            p_inlined.term,
+            Constr,
+            "Variable in Constr field was not inlined - Apply(Lambda,...) should become Constr directly",
+        )
+
+    def test_inline_variables_program_visit(self):
+        """GuaranteedExecutionChecker.visit_Program delegates to the term."""
+        from uplc.optimizer.inline_variables import GuaranteedExecutionChecker
+
+        # Program wrapping a body where x is in a guaranteed position
+        prog = Program((1, 0, 0), Variable("x"))
+        self.assertTrue(
+            GuaranteedExecutionChecker("x").visit(prog),
+            "x at top-level of Program should be in guaranteed position",
+        )
+
+        # Program wrapping a body where x is NOT guaranteed (inside Delay)
+        prog_not_guaranteed = Program((1, 0, 0), Delay(Variable("x")))
+        self.assertFalse(
+            GuaranteedExecutionChecker("x").visit(prog_not_guaranteed),
+            "x inside Delay in Program should NOT be in guaranteed position",
         )
 
     def test_compiler_options(self):
