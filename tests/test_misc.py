@@ -1701,6 +1701,191 @@ class MiscTest(unittest.TestCase):
         p = remove_force_delay.ForceDelayRemover().visit(p)
         self.assertEqual(p.term, Error(), "Force-Delay was not removed.")
 
+    def test_inline_variables_single_use_guaranteed(self):
+        """Variable used once in a guaranteed position is inlined."""
+        from uplc.optimizer.inline_variables import InlineVariableOptimizer
+        from uplc.transformer.unique_variables import UniqueVariableTransformer
+
+        # [(lam x [addInteger x (con integer 1)]) (con integer 10)]
+        p = Program(
+            (1, 0, 0),
+            Apply(
+                Lambda(
+                    "x",
+                    Apply(
+                        Apply(BuiltIn(BuiltInFun.AddInteger), Variable("x")),
+                        BuiltinInteger(1),
+                    ),
+                ),
+                BuiltinInteger(10),
+            ),
+        )
+        p = UniqueVariableTransformer().visit(p)
+        p_inlined = InlineVariableOptimizer().visit(p)
+        # The Lambda binding should have been removed (outer Apply(Lambda, val) is gone)
+        self.assertNotIsInstance(
+            p_inlined.term.f,
+            Lambda,
+            "Variable was not inlined - Lambda binding should be gone",
+        )
+        # Result must still be correct
+        r = eval(p_inlined)
+        self.assertEqual(r.result, BuiltinInteger(11))
+
+    def test_inline_variables_not_inlined_when_used_twice(self):
+        """Variable used twice is NOT inlined."""
+        from uplc.optimizer.inline_variables import InlineVariableOptimizer
+        from uplc.transformer.unique_variables import UniqueVariableTransformer
+
+        # [(lam x [x x]) (con integer 5)]
+        p = Program(
+            (1, 0, 0),
+            Apply(
+                Lambda("x", Apply(Variable("x"), Variable("x"))),
+                BuiltinInteger(5),
+            ),
+        )
+        p = UniqueVariableTransformer().visit(p)
+        before = p.dumps()
+        p_after = InlineVariableOptimizer().visit(p)
+        self.assertEqual(
+            before, p_after.dumps(), "Double-use variable should NOT be inlined"
+        )
+
+    def test_inline_variables_not_inlined_inside_delay(self):
+        """Variable used inside Delay is NOT inlined (not guaranteed)."""
+        from uplc.optimizer.inline_variables import InlineVariableOptimizer
+        from uplc.transformer.unique_variables import UniqueVariableTransformer
+
+        # [(lam x (delay x)) (con integer 42)]
+        p = Program(
+            (1, 0, 0),
+            Apply(
+                Lambda("x", Delay(Variable("x"))),
+                BuiltinInteger(42),
+            ),
+        )
+        p = UniqueVariableTransformer().visit(p)
+        before = p.dumps()
+        p_after = InlineVariableOptimizer().visit(p)
+        self.assertEqual(
+            before, p_after.dumps(), "Variable inside Delay should NOT be inlined"
+        )
+
+    def test_inline_variables_not_inlined_inside_lambda(self):
+        """Variable used only inside a nested Lambda body is NOT inlined."""
+        from uplc.optimizer.inline_variables import InlineVariableOptimizer
+        from uplc.transformer.unique_variables import UniqueVariableTransformer
+
+        # [(lam x (lam y x)) (con integer 5)]
+        p = Program(
+            (1, 0, 0),
+            Apply(
+                Lambda("x", Lambda("y", Variable("x"))),
+                BuiltinInteger(5),
+            ),
+        )
+        p = UniqueVariableTransformer().visit(p)
+        before = p.dumps()
+        p_after = InlineVariableOptimizer().visit(p)
+        self.assertEqual(
+            before, p_after.dumps(), "Variable inside Lambda body should NOT be inlined"
+        )
+
+    def test_inline_variables_o3_preserves_semantics(self):
+        """O3 compilation with inline_variables produces the same results as O0."""
+        with open("examples/fibonacci.uplc", "r") as f:
+            p = parse(f.read())
+        p0 = tools.compile(p, compiler_config.OPT_O0_CONFIG)
+        p3 = tools.compile(p, compiler_config.OPT_O3_CONFIG)
+        for i in range(5):
+            r0 = eval(p0, BuiltinInteger(i))
+            r3 = eval(p3, BuiltinInteger(i))
+            self.assertEqual(
+                r0.result,
+                r3.result,
+                f"O3 result differs from O0 for input {i}",
+            )
+
+    def test_inline_variables_case_scrutinee_guaranteed(self):
+        """Variable in Case scrutinee position is inlined (guaranteed)."""
+        from uplc.optimizer.inline_variables import (
+            GuaranteedExecutionChecker,
+            VariableOccurrenceCounter,
+        )
+
+        # body = (case x (lam y y))  -- x is in scrutinee, guaranteed
+        body = Case(Variable("x"), [Lambda("y", Variable("y"))])
+        counter = VariableOccurrenceCounter()
+        counter.visit(body)
+        self.assertEqual(counter.counts.get("x", 0), 1)
+        self.assertTrue(
+            GuaranteedExecutionChecker("x").visit(body),
+            "x in Case scrutinee should be in guaranteed position",
+        )
+
+    def test_inline_variables_case_branch_not_guaranteed(self):
+        """Variable inside Case branch is NOT in a guaranteed position."""
+        from uplc.optimizer.inline_variables import GuaranteedExecutionChecker
+
+        # body = (case (con integer 0) (lam y x))  -- x is only in branch, not scrutinee
+        body = Case(BuiltinInteger(0), [Lambda("y", Variable("x"))])
+        self.assertFalse(
+            GuaranteedExecutionChecker("x").visit(body),
+            "x inside Case branch should NOT be in guaranteed position",
+        )
+
+    def test_inline_variables_constr_field_guaranteed(self):
+        """Variable inside a Constr field is in a guaranteed position."""
+        from uplc.optimizer.inline_variables import (
+            GuaranteedExecutionChecker,
+            InlineVariableOptimizer,
+        )
+        from uplc.transformer.unique_variables import UniqueVariableTransformer
+
+        # GuaranteedExecutionChecker: x inside Constr fields should be guaranteed
+        body = Constr(0, [Variable("x"), BuiltinInteger(1)])
+        self.assertTrue(
+            GuaranteedExecutionChecker("x").visit(body),
+            "x inside Constr fields should be in guaranteed position",
+        )
+
+        # Also verify the optimizer actually inlines through a Constr field
+        # [(lam x (constr 0 x (con integer 1))) (con integer 5)]
+        p = Program(
+            (1, 0, 0),
+            Apply(
+                Lambda("x", Constr(0, [Variable("x"), BuiltinInteger(1)])),
+                BuiltinInteger(5),
+            ),
+        )
+        p = UniqueVariableTransformer().visit(p)
+        p_inlined = InlineVariableOptimizer().visit(p)
+        # After inlining, Apply(Lambda, val) is replaced by the Constr directly
+        self.assertIsInstance(
+            p_inlined.term,
+            Constr,
+            "Variable in Constr field was not inlined - Apply(Lambda,...) should become Constr directly",
+        )
+
+    def test_inline_variables_program_visit(self):
+        """GuaranteedExecutionChecker.visit_Program delegates to the term."""
+        from uplc.optimizer.inline_variables import GuaranteedExecutionChecker
+
+        # Program wrapping a body where x is in a guaranteed position
+        prog = Program((1, 0, 0), Variable("x"))
+        self.assertTrue(
+            GuaranteedExecutionChecker("x").visit(prog),
+            "x at top-level of Program should be in guaranteed position",
+        )
+
+        # Program wrapping a body where x is NOT guaranteed (inside Delay)
+        prog_not_guaranteed = Program((1, 0, 0), Delay(Variable("x")))
+        self.assertFalse(
+            GuaranteedExecutionChecker("x").visit(prog_not_guaranteed),
+            "x inside Delay in Program should NOT be in guaranteed position",
+        )
+
     def test_compiler_options(self):
         with open("examples/fibonacci.uplc", "r") as f:
             p = parse(f.read())

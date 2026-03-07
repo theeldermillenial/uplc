@@ -16,6 +16,7 @@ from uplc.optimizer import (
     remove_force_delay,
     pre_apply_args,
     deduplicate,
+    inline_variables,
 )
 
 acceptance_test_path = Path(__file__).parent.parent / "examples/acceptance_tests"
@@ -44,6 +45,8 @@ rewriters = [
     pre_apply_args.ApplyLambdaTransformer,
     # Apply deduplication
     deduplicate.Deduplicate,
+    # Inline single-use variables in guaranteed positions
+    inline_variables.InlineVariableOptimizer,
 ]
 
 
@@ -116,6 +119,7 @@ class AcceptanceTests(unittest.TestCase):
             pre_evaluation.PreEvaluationOptimizer,
             remove_force_delay.ForceDelayRemover,
             pre_apply_args.ApplyLambdaTransformer,
+            inline_variables.InlineVariableOptimizer,
         ):
             self.assertGreaterEqual(
                 expected_spent_budget,
