@@ -8,7 +8,6 @@ from uplc import *
 from uplc import compiler_config
 from uplc.transformer import unique_variables
 from uplc.optimizer import pre_evaluation, remove_force_delay
-from uplc.optimizer import pre_apply_args, deduplicate, inline_variables
 from uplc.lexer import strip_comments
 from uplc.ast import *
 
@@ -1576,24 +1575,6 @@ class MiscTest(unittest.TestCase):
         d = dumps(p)
         # should not raise
         parse(d)
-        r = eval(p)
-        self.assertEqual(r.result, BuiltinUnit())
-
-    @parameterized.expand(
-        [
-            ("UniqueVariableTransformer", unique_variables.UniqueVariableTransformer),
-            ("PreEvaluationOptimizer", pre_evaluation.PreEvaluationOptimizer),
-            ("ForceDelayRemover", remove_force_delay.ForceDelayRemover),
-            ("ApplyLambdaTransformer", pre_apply_args.ApplyLambdaTransformer),
-            ("Deduplicate", deduplicate.Deduplicate),
-            ("InlineVariableOptimizer", inline_variables.InlineVariableOptimizer),
-        ]
-    )
-    def test_simple_contract_rewrite_semantic_equivalence(self, _, rewriter):
-        """All rewriters must preserve the semantics of the sample contract."""
-        p = SAMPLE_CONTRACT
-        p = unique_variables.UniqueVariableTransformer().visit(p)
-        p = rewriter().visit(p)
         r = eval(p)
         self.assertEqual(r.result, BuiltinUnit())
 

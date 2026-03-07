@@ -11,6 +11,7 @@ from uplc import *
 from uplc.flat_decoder import unzigzag
 from uplc.flat_encoder import zigzag
 from uplc.optimizer import pre_evaluation, pre_apply_args, deduplicate
+from uplc.optimizer import inline_variables
 from uplc.tools import unflatten
 from uplc.transformer import unique_variables, debrujin_variables, undebrujin_variables
 from uplc.ast import *
@@ -600,6 +601,84 @@ class HypothesisTests(unittest.TestCase):
             rewrite_p_size,
             orig_p_size * max_increase,
             f"Size increased too much from {orig_p_size} to {rewrite_p_size} in {code}",
+        )
+        params = []
+        try:
+            orig_res = orig_p
+            for _ in range(100):
+                if isinstance(orig_res, Exception):
+                    break
+                if isinstance(orig_res, BoundStateLambda) or isinstance(
+                    orig_res, ForcedBuiltIn
+                ):
+                    p = BuiltinUnit()
+                    params.append(p)
+                    orig_res = Apply(orig_res, p)
+                if isinstance(orig_res, BoundStateDelay):
+                    orig_res = Force(orig_res)
+                orig_res = eval(orig_res).result
+            if not isinstance(orig_res, Exception):
+                orig_res = unique_variables.UniqueVariableTransformer().visit(orig_res)
+        except unique_variables.FreeVariableError:
+            self.fail(f"Free variable error occurred after evaluation in {code}")
+        try:
+            rewrite_res = rewrite_p
+            for _ in range(100):
+                if isinstance(rewrite_res, Exception):
+                    break
+                if isinstance(rewrite_res, BoundStateLambda) or isinstance(
+                    rewrite_res, ForcedBuiltIn
+                ):
+                    p = params.pop(0)
+                    rewrite_res = Apply(rewrite_res, p)
+                if isinstance(rewrite_res, BoundStateDelay):
+                    rewrite_res = Force(rewrite_res)
+                rewrite_res = eval(rewrite_res).result
+            if not isinstance(rewrite_res, Exception):
+                rewrite_res = unique_variables.UniqueVariableTransformer().visit(
+                    rewrite_res
+                )
+        except unique_variables.FreeVariableError:
+            self.fail(f"Free variable error occurred after evaluation in {code}")
+        if not isinstance(rewrite_res, Exception):
+            if isinstance(orig_res, Exception):
+                self.assertIsInstance(
+                    orig_res,
+                    RuntimeError,
+                    "Original code resulted in something different than a runtime error (exceeding budget) and rewritten result is ok",
+                )
+            self.assertEqual(
+                orig_res,
+                rewrite_res,
+                f"Two programs evaluate to different results after optimization in {code}",
+            )
+        else:
+            self.assertIsInstance(
+                orig_res,
+                Exception,
+                "Rewrite result was exception but orig result is not an exception",
+            )
+
+    @hypothesis.given(uplc_program_valid)
+    @hypothesis.settings(max_examples=1000, deadline=datetime.timedelta(seconds=1))
+    @hypothesis.example(
+        parse(
+            "(program 1.0.0 [(lam x [(builtin addInteger) x (con integer 1)]) (con integer 10)])"
+        )
+    )
+    @hypothesis.example(
+        parse("(program 1.0.0 [(lam x (lam y x)) (con integer 0)])")
+    )
+    @hypothesis.example(
+        parse("(program 1.0.0 [(lam x (delay x)) (con integer 0)])")
+    )
+    def test_inline_variables_no_semantic_change(self, p):
+        code = dumps(p)
+        orig_p = parse(code).term
+        rewrite_p = (
+            inline_variables.InlineVariableOptimizer()
+            .visit(UniqueVariableTransformer().visit(p))
+            .term
         )
         params = []
         try:
