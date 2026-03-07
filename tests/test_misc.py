@@ -1532,12 +1532,14 @@ class MiscTest(unittest.TestCase):
         )
 
     def test_parse(self):
-        p = parse("""
+        p = parse(
+            """
 (program
   1.0.0
   [ [ [ (force (delay [(lam i_0 (con integer 2)) (con bytestring #02)])) (builtin addInteger) ] (error) ] (con pair<list<integer>,unit> [[],()]) ]
 )
-        """)
+        """
+        )
         print(dumps(p))
 
     @parameterized.expand(
