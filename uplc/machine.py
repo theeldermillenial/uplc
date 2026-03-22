@@ -26,7 +26,10 @@ def budget_cost_of_op_on_model(
     values=[],
 ):
     if op not in model.cpu or op not in model.memory:
-        return Budget(0, 0)
+        raise RuntimeError(
+            f"No cost model entry for builtin {op!r}. "
+            f"This builtin may not be available in the selected Plutus version."
+        )
     return Budget(
         cpu=model.cpu[op].cost(*args, values=values),
         memory=model.memory[op].cost(*args, values=values),
