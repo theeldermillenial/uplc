@@ -2009,3 +2009,44 @@ class MiscTest(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             data_from_json(param)
         self.assertIn("expected a list", str(context.exception).lower())
+
+
+class TestV3StrictMode(unittest.TestCase):
+    """Tests for unflatten(strict=True) PlutusV3 trailing bytes rejection."""
+
+    def test_unflatten_no_trailing_strict_ok(self):
+        """Clean program passes with strict=True."""
+        from uplc.tools import flatten, unflatten
+        from uplc.ast import Program, BuiltinInteger
+        prog = Program((1, 0, 0), BuiltinInteger(42))
+        cbor_bytes = flatten(prog)
+        result = unflatten(cbor_bytes, strict=True)
+        self.assertIsInstance(result, Program)
+
+    def test_unflatten_strict_rejects_trailing(self):
+        """Program with trailing bytes rejected when strict=True."""
+        from uplc.tools import flatten, unflatten
+        from uplc.ast import Program, BuiltinInteger
+        prog = Program((1, 0, 0), BuiltinInteger(42))
+        cbor_bytes = flatten(prog)
+        # Append garbage
+        import cbor2
+        inner = cbor2.loads(cbor_bytes)
+        padded = inner + b'\xde\xad'
+        bad_cbor = cbor2.dumps(padded)
+        with self.assertRaises(ValueError):
+            unflatten(bad_cbor, strict=True)
+
+    def test_unflatten_lenient_allows_trailing(self):
+        """Trailing bytes allowed when strict=False (default)."""
+        from uplc.tools import flatten, unflatten
+        from uplc.ast import Program, BuiltinInteger
+        prog = Program((1, 0, 0), BuiltinInteger(42))
+        cbor_bytes = flatten(prog)
+        import cbor2
+        inner = cbor2.loads(cbor_bytes)
+        padded = inner + b'\xde\xad'
+        bad_cbor = cbor2.dumps(padded)
+        # Should not raise with strict=False
+        result = unflatten(bad_cbor, strict=False)
+        self.assertIsInstance(result, Program)
