@@ -26,7 +26,6 @@ from .flat_decoder import UplcDeserializer
 from .transformer.debrujin_variables import DeBrujinVariableTransformer
 from .transformer.undebrujin_variables import UnDeBrujinVariableTransformer
 from .transformer.unique_variables import UniqueVariableTransformer
-from .transformer.plutus_version_enforcer import PlutusVersionEnforcer, UnsupportedTerm
 from .util import NoOp
 
 
@@ -39,12 +38,26 @@ def flatten(x: Program) -> bytes:
     return cbor2.dumps(x_flattened)
 
 
-def unflatten(x_cbor: bytes) -> Program:
-    """Returns the program from a singly-CBOR wrapped flat encoding"""
+def unflatten(x_cbor: bytes, *, strict: bool = False) -> Program:
+    """Returns the program from a singly-CBOR wrapped flat encoding.
+
+    Args:
+        x_cbor: CBOR-wrapped flat-encoded UPLC program bytes.
+        strict: If True, reject programs with trailing bytes after the
+            flat encoding. PlutusV3 requires strict mode (Conway-era
+            tightening). PlutusV1/V2 are lenient (trailing bytes ignored).
+    """
     x = cbor2.loads(x_cbor)
     x_bin = "".join(f"{i:08b}" for i in x)
     reader = UplcDeserializer(x_bin)
     x_debrujin = reader.read_program()
+    reader.finalize()
+    if strict and reader.has_trailing_data():
+        raise ValueError(
+            f"Trailing data after flat-encoded program "
+            f"({len(reader._bits) - reader._pos} bits remaining). "
+            f"PlutusV3 requires strict deserialization with no trailing bytes."
+        )
     x_uplc = UnDeBrujinVariableTransformer().visit(x_debrujin)
     return x_uplc
 
@@ -59,7 +72,6 @@ def parse(s: str, filename=None):
     try:
         tks = l.lex(s)
         program = p.parse(tks)
-        PlutusVersionEnforcer().visit(program)
     except rply.errors.LexingError as e:
         source = s.splitlines()[e.source_pos.lineno - 1]
         raise SyntaxError(
@@ -71,10 +83,6 @@ def parse(s: str, filename=None):
         raise SyntaxError(
             f"Parsing failed, invalid production: {e.message}",
             (filename, e.source_pos.lineno, e.source_pos.colno, source),
-        ) from None
-    except UnsupportedTerm as e:
-        raise SyntaxError(
-            f"Parsing failed, unsupported term: {e.message}",
         ) from None
     return program
 
