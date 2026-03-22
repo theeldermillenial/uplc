@@ -492,7 +492,7 @@ def wrap_builtin_type(typ: ast.Constant, val):
             wrap_builtin_type(typ.r_value, val[1]),
         )
     if isinstance(typ, ast.BuiltinUnit):
-        assert val is None, f"Expected () but found {type(val)}"
+        # Accept None (from "()" literal) or int (from number literal) — value is ignored
         return ast.BuiltinUnit()
     if isinstance(typ, ast.BuiltinByteString):
         assert isinstance(val, bytes), f"Expected bytes but found {type(val)}"
@@ -507,7 +507,12 @@ def wrap_builtin_type(typ: ast.Constant, val):
     if isinstance(typ, ast.BuiltinString):
         assert isinstance(val, str), f"Expected str but found {type(val)}"
     if isinstance(typ, ast.BuiltinInteger):
+        if isinstance(val, bytes):
+            val = int.from_bytes(val, "big", signed=False)
         assert isinstance(val, int), f"Expected int but found {type(val)}"
     if isinstance(typ, ast.BuiltinBool):
+        # Accept int as bool: 0=False, nonzero=True (conformance suite uses (con bool 0))
+        if isinstance(val, int) and not isinstance(val, bool):
+            val = val != 0
         assert isinstance(val, bool), f"Expected bool but found {type(val)}"
     return typ.__class__(val)
