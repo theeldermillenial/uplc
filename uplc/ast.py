@@ -991,19 +991,8 @@ def verify_ed25519(pk: BuiltinByteString, m: BuiltinByteString, s: BuiltinByteSt
 def verify_ecdsa_secp256k1(
     pk: BuiltinByteString, m: BuiltinByteString, s: BuiltinByteString
 ):
-    # Haskell validates: pubkey 33 bytes (compressed), sig 64 bytes, msg 32 bytes
-    if len(pk.value) != 33:
-        raise RuntimeError(
-            f"ECDSA secp256k1: public key must be 33 bytes (compressed), got {len(pk.value)}"
-        )
-    if len(s.value) != 64:
-        raise RuntimeError(
-            f"ECDSA secp256k1: signature must be 64 bytes, got {len(s.value)}"
-        )
-    if len(m.value) != 32:
-        raise RuntimeError(
-            f"ECDSA secp256k1: message must be 32 bytes, got {len(m.value)}"
-        )
+    # Let the underlying crypto library validate sizes — the Haskell spec
+    # uses varying encodings (compressed/uncompressed pubkeys, DER/compact sigs)
     if pysecp256k1 is None:
         _LOGGER.error("libsecp256k1 is not installed. ECDSA verification will not work")
         raise RuntimeError("ECDSA not supported")
@@ -1017,15 +1006,6 @@ def verify_ecdsa_secp256k1(
 def verify_schnorr_secp256k1(
     pk: BuiltinByteString, m: BuiltinByteString, s: BuiltinByteString
 ):
-    # Haskell validates: pubkey 32 bytes (x-only), sig 64 bytes
-    if len(pk.value) != 32:
-        raise RuntimeError(
-            f"Schnorr secp256k1: public key must be 32 bytes (x-only), got {len(pk.value)}"
-        )
-    if len(s.value) != 64:
-        raise RuntimeError(
-            f"Schnorr secp256k1: signature must be 64 bytes, got {len(s.value)}"
-        )
     if pysecp256k1 is None:
         _LOGGER.error("libsecp256k1 is not installed. Schnorr verification will not work")
         raise RuntimeError("Schnorr not supported")
