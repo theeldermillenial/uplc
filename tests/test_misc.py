@@ -2009,3 +2009,27 @@ class MiscTest(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             data_from_json(param)
         self.assertIn("expected a list", str(context.exception).lower())
+
+    def test_haskell_string_escapes(self):
+        """Test Haskell decimal (\\DDD) and octal (\\oOOO) string escapes.
+
+        Conformance test string-04:
+        Input: (con string "\\t\\"\\83\\x75\\x63\\o143e\\x73s\\o041\\o042\\n")
+        Expected decoded value: \\t"Success!"\\n
+        """
+        program = r'(program 1.0.0 (con string "\t\"\83\x75\x63\o143e\x73s\o041\o042\n"))'
+        p = parse(program)
+        # The string value should be: tab + "Success!" + newline
+        self.assertEqual(p.term.value, '\t"Success!"\n')
+
+    def test_haskell_decimal_escape(self):
+        """Test standalone Haskell decimal escape."""
+        program = r'(program 1.0.0 (con string "\65"))'
+        p = parse(program)
+        self.assertEqual(p.term.value, 'A')  # chr(65) == 'A'
+
+    def test_haskell_octal_escape(self):
+        """Test standalone Haskell octal escape."""
+        program = r'(program 1.0.0 (con string "\o101"))'
+        p = parse(program)
+        self.assertEqual(p.term.value, 'A')  # chr(0o101) == 'A'
