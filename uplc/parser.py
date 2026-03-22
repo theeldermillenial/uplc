@@ -202,13 +202,17 @@ class Parser:
                 return ast.BuiltinUnit()
             if name == "data":
                 return ast.PlutusData()
+            if name == "boolean":
+                return ast.BuiltinBool(False)
+            if name == "array":
+                return ast.BuiltinList([], ast.PlutusData())  # default element type
             raise SyntaxError(f"Unknown builtin type {name}")
 
         @self.pg.production("constanttype : name CARET_OPEN constanttype CARET_CLOSE")
         def constanttype(p):
             # the Aiken dialect
             name = p[0].value
-            if name == "list":
+            if name == "list" or name == "array":
                 return ast.BuiltinList([], p[2])
             raise SyntaxError(f"Unknown builtin type {name}")
 
@@ -216,7 +220,7 @@ class Parser:
         def constanttype(p):
             # the Plutus dialect
             name = p[1].value
-            if name == "list":
+            if name == "list" or name == "array":
                 return ast.BuiltinList([], p[2])
             raise SyntaxError(f"Unknown builtin type {name}")
 
