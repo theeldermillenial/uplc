@@ -1,4 +1,4 @@
--- constr can't be used before 1.1.0
+-- constr in v1.0.0: version restriction removed from textual parser
 (program 1.0.0
     (constr 0 )
 )

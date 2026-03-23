@@ -1,4 +1,4 @@
--- case can't be used before 1.1.0
+-- case in v1.0.0: parses but fails at eval (no branches for integer)
 (program 1.0.0
     (case (con integer 1))
 )
