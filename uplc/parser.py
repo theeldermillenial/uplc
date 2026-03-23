@@ -173,6 +173,10 @@ class Parser:
                 raise SyntaxError(
                     f"Negative constructor tag {p[2]} is not allowed"
                 )
+            if p[2] > 2**64 - 1:
+                raise SyntaxError(
+                    f"Constructor tag {p[2]} exceeds Word64 max (2^64-1)"
+                )
             return Constr(
                 p[2],
                 p[3],

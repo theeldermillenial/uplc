@@ -65,7 +65,9 @@ TOKENS = {
     "HEX_BLS_G1": r"\b0[Xx][\dabcdefABCDEF]{96}\b",
     "HEX_BLS_G2": r"\b0[Xx][\dabcdefABCDEF]{192}\b",
     "HEX": r"#([\dabcdefABCDEF][\dabcdefABCDEF])*",
-    "NAME_NON_SPECIAL": r"[\w_~'][\w\d_~'!#]*",
+    # Haskell UPLC output uses hyphenated names like x-0, f-1, j_1-0.
+    # Allow hyphens within identifiers (but not at the start).
+    "NAME_NON_SPECIAL": r"[\w_~'][\w\d_~'!#-]*",
 }
 
 
