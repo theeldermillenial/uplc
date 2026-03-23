@@ -2010,7 +2010,6 @@ class MiscTest(unittest.TestCase):
             data_from_json(param)
         self.assertIn("expected a list", str(context.exception).lower())
 
-<<<<<<< HEAD
     def test_haskell_string_escapes(self):
         """Test Haskell decimal (\\DDD) and octal (\\oOOO) string escapes.
 
