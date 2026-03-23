@@ -2188,3 +2188,52 @@ class TestVersionEnforcerRemoved(unittest.TestCase):
         prog = parse("(program 1.1.0 (constr 0))")
         self.assertIsNotNone(prog)
 
+
+
+class TestBuiltinVersionEnforcement(unittest.TestCase):
+    """Tests for builtin version enforcement at deserialization.
+
+    UPLC version (1, 0, 0) covers both PlutusV1 and V2 builtins (IDs 0-53).
+    UPLC version (1, 1, 0) adds PlutusV3 builtins (IDs 54+).
+    The V1/V2 distinction is enforced at the Cardano ledger layer, not UPLC.
+
+    Haskell ref: PlutusCore/Default/Builtins.hs (BuiltinSemanticsVariant)
+    Haskell ref: Cardano.Ledger.Plutus.Language.deserialiseScript
+    """
+
+    def test_v1_builtin_in_v1_ok(self):
+        """AddInteger (ID 0) in v1.0.0 program passes."""
+        from uplc.transformer.builtin_version_enforcer import BuiltinVersionEnforcer
+        from uplc.tools import parse
+        prog = parse("(program 1.0.0 (builtin addInteger))")
+        BuiltinVersionEnforcer().visit(prog)
+
+    def test_v2_builtin_in_v1_ok(self):
+        """SerialiseData (ID 51) in v1.0.0 — allowed at UPLC level.
+
+        V1/V2 distinction is at the Cardano ledger layer, not UPLC.
+        Both use program version (1, 0, 0).
+        """
+        from uplc.transformer.builtin_version_enforcer import BuiltinVersionEnforcer
+        from uplc.tools import parse
+        prog = parse("(program 1.0.0 (builtin serialiseData))")
+        BuiltinVersionEnforcer().visit(prog)
+
+    def test_v3_builtin_in_v1_rejected(self):
+        """Bls12_381_G1_add (ID 54+) in v1.0.0 program rejected."""
+        from uplc.transformer.builtin_version_enforcer import (
+            BuiltinVersionEnforcer,
+            UnsupportedBuiltin,
+        )
+        from uplc.tools import parse
+        prog = parse("(program 1.0.0 (builtin bls12_381_G1_add))")
+        with self.assertRaises(UnsupportedBuiltin):
+            BuiltinVersionEnforcer().visit(prog)
+
+    def test_v3_builtin_in_v3_ok(self):
+        """Bls12_381_G1_add in v1.1.0 program passes."""
+        from uplc.transformer.builtin_version_enforcer import BuiltinVersionEnforcer
+        from uplc.tools import parse
+        prog = parse("(program 1.1.0 (builtin bls12_381_G1_add))")
+        # Should not raise
+        BuiltinVersionEnforcer().visit(prog)

@@ -38,7 +38,12 @@ def flatten(x: Program) -> bytes:
     return cbor2.dumps(x_flattened)
 
 
-def unflatten(x_cbor: bytes, *, strict: bool = False) -> Program:
+def unflatten(
+    x_cbor: bytes,
+    *,
+    strict: bool = False,
+    check_builtins: bool = False,
+) -> Program:
     """Returns the program from a singly-CBOR wrapped flat encoding.
 
     Args:
@@ -46,6 +51,9 @@ def unflatten(x_cbor: bytes, *, strict: bool = False) -> Program:
         strict: If True, reject programs with trailing bytes after the
             flat encoding. PlutusV3 requires strict mode (Conway-era
             tightening). PlutusV1/V2 are lenient (trailing bytes ignored).
+        check_builtins: If True, verify all builtins in the program are
+            available in the declared program version. Raises
+            UnsupportedBuiltin if a builtin is used from a later version.
     """
     x = cbor2.loads(x_cbor)
     x_bin = "".join(f"{i:08b}" for i in x)
@@ -59,6 +67,9 @@ def unflatten(x_cbor: bytes, *, strict: bool = False) -> Program:
             f"PlutusV3 requires strict deserialization with no trailing bytes."
         )
     x_uplc = UnDeBrujinVariableTransformer().visit(x_debrujin)
+    if check_builtins:
+        from .transformer.builtin_version_enforcer import BuiltinVersionEnforcer
+        BuiltinVersionEnforcer().visit(x_uplc)
     return x_uplc
 
 
