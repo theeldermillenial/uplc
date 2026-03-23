@@ -2010,6 +2010,7 @@ class MiscTest(unittest.TestCase):
             data_from_json(param)
         self.assertIn("expected a list", str(context.exception).lower())
 
+<<<<<<< HEAD
     def test_haskell_string_escapes(self):
         """Test Haskell decimal (\\DDD) and octal (\\oOOO) string escapes.
 
@@ -2092,3 +2093,39 @@ class TestMiscBugfixes(unittest.TestCase):
         from pathlib import Path
         p = Path("test.json")
         self.assertEqual(p.suffix, ".json")
+
+
+class TestTypeCoercionAndCase(unittest.TestCase):
+    """Tests for type coercion in constants and case on non-Constr values."""
+
+    def test_int_as_bool_false(self):
+        """(con bool 0) parses as False."""
+        from uplc.tools import parse
+        prog = parse("(program 1.0.0 (con bool 0))")
+        self.assertIsNotNone(prog)
+
+    def test_int_as_bool_true(self):
+        """(con bool 1) parses as True."""
+        from uplc.tools import parse
+        prog = parse("(program 1.0.0 (con bool 1))")
+        self.assertIsNotNone(prog)
+
+    def test_unit_accepts_int(self):
+        """(con unit 0) parses (value ignored for unit)."""
+        from uplc.tools import parse
+        prog = parse("(program 1.0.0 (con unit ()))")
+        self.assertIsNotNone(prog)
+
+    def test_case_on_bool_true(self):
+        """case on True selects branch 1."""
+        from uplc.tools import eval, parse
+        prog = parse("(program 1.1.0 (case (con bool True) (con integer 10) (con integer 20)))")
+        result = eval(prog)
+        self.assertEqual(result.result.value, 20)
+
+    def test_case_on_bool_false(self):
+        """case on False selects branch 0."""
+        from uplc.tools import eval, parse
+        prog = parse("(program 1.1.0 (case (con bool False) (con integer 10) (con integer 20)))")
+        result = eval(prog)
+        self.assertEqual(result.result.value, 10)
