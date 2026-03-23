@@ -1145,6 +1145,15 @@ wheels = [
 ]
 
 [[package]]
+name = "future"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a7/b2/4140c69c6a66432916b26158687e821ba631a4c9273c474343badf84d3ba/future-1.0.0.tar.gz", hash = "sha256:bd2968309307861edae1458a4f8a4f3598c03be43b97521076aebf5d94c07b05", size = 1228490, upload-time = "2024-02-21T11:52:38.461Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/da/71/ae30dadffc90b9006d77af76b393cb9dfbfc9629f339fc1574a1c52e6806/future-1.0.0-py3-none-any.whl", hash = "sha256:929292d34f5872e70396626ef385ec22355a1fae8ad29e1a734c3e43f9fbc216", size = 491326, upload-time = "2024-02-21T11:52:35.956Z" },
+]
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2124,6 +2133,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pysecp256k1"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "future" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b0/d3/883fa0aa75de245edeae9ca557cf1fd051119689bb5c3fca102a666a72a2/pySecp256k1-1.1.0.tar.gz", hash = "sha256:ce22b5581b50926d37f241de13df445961c2185d386e02616e0abecc05863b8e", size = 9636, upload-time = "2021-06-05T15:11:38.821Z" }
+
+[[package]]
 name = "pytest"
 version = "8.4.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2839,6 +2857,12 @@ dependencies = [
     { name = "rply" },
 ]
 
+[package.optional-dependencies]
+crypto = [
+    { name = "pyblst" },
+    { name = "pysecp256k1" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "black" },
@@ -2858,13 +2882,16 @@ requires-dist = [
     { name = "frozendict", specifier = ">=2.3.8" },
     { name = "frozenlist2", specifier = ">=1.0.0" },
     { name = "pyblst", specifier = ">=0.3.14" },
+    { name = "pyblst", marker = "extra == 'crypto'", specifier = ">=0.3.0" },
     { name = "pycardano", specifier = ">=0.9.0" },
     { name = "pycryptodome", specifier = ">=3.21.0" },
     { name = "pynacl", specifier = ">=1.6.0" },
+    { name = "pysecp256k1", marker = "extra == 'crypto'", specifier = ">=0.14.0" },
     { name = "python-secp256k1-cardano", specifier = ">=0.2.4" },
     { name = "regex", specifier = ">=2025.9.18" },
     { name = "rply", specifier = ">=0.7.8" },
 ]
+provides-extras = ["crypto"]
 
 [package.metadata.requires-dev]
 dev = [
