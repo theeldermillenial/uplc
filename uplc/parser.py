@@ -202,6 +202,8 @@ class Parser:
                 return ast.BuiltinUnit()
             if name == "data":
                 return ast.PlutusData()
+            if name == "array":
+                return ast.BuiltinList([], ast.PlutusData())  # default element type
             raise SyntaxError(f"Unknown builtin type {name}")
 
         @self.pg.production("constanttype : name CARET_OPEN constanttype CARET_CLOSE")
