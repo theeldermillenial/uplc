@@ -26,6 +26,7 @@ from .flat_decoder import UplcDeserializer
 from .transformer.debrujin_variables import DeBrujinVariableTransformer
 from .transformer.undebrujin_variables import UnDeBrujinVariableTransformer
 from .transformer.unique_variables import UniqueVariableTransformer
+from .transformer.plutus_version_enforcer import PlutusVersionEnforcer, UnsupportedTerm
 from .util import NoOp
 
 
@@ -83,6 +84,11 @@ def parse(s: str, filename=None):
     try:
         tks = l.lex(s)
         program = p.parse(tks)
+        PlutusVersionEnforcer().visit(program)
+    except UnsupportedTerm as e:
+        raise SyntaxError(
+            f"Parsing failed, unsupported term: {e.message}",
+        ) from None
     except rply.errors.LexingError as e:
         source = s.splitlines()[e.source_pos.lineno - 1]
         raise SyntaxError(

@@ -2089,17 +2089,17 @@ class MiscTest(unittest.TestCase):
         self.assertEqual(result.result.value, 42)
 
     def test_case_on_list_nil(self):
-        """Test case on empty list: nil = tag 0."""
+        """Test case on empty list: Nil = tag 1 (SOP: Cons=0, Nil=1)."""
         program = parse(
-            "(program 1.1.0 (case (con (list integer) []) (con integer 1) (con integer 2)))"
+            "(program 1.1.0 (case (con (list integer) []) (lam h (lam t (con integer 1))) (con integer 2)))"
         )
         result = eval(program)
-        self.assertEqual(result.result.value, 1)
+        self.assertEqual(result.result.value, 2)
 
     def test_case_on_list_cons(self):
-        """Test case on non-empty list: cons = tag 1 with fields [head, tail]."""
+        """Test case on non-empty list: Cons = tag 0 (SOP: Cons=0, Nil=1)."""
         program = parse(
-            "(program 1.1.0 (case (con (list integer) [5, 6]) (con integer 1) (lam h (lam t (con integer 2)))))"
+            "(program 1.1.0 (case (con (list integer) [5, 6]) (lam h (lam t (con integer 2))) (con integer 1)))"
         )
         result = eval(program)
         self.assertEqual(result.result.value, 2)
@@ -2270,20 +2270,38 @@ class TestParserTypeKeywords(unittest.TestCase):
             parse("(program 1.0.0 (con boolean True))")
 
 
-class TestVersionEnforcerRemoved(unittest.TestCase):
-    """Tests that case/constr parse in any program version."""
+class TestVersionEnforcer(unittest.TestCase):
+    """Tests that case/constr are version-gated by PlutusVersionEnforcer."""
 
-    def test_parse_constr_in_v1(self):
-        """constr parses in program version 1.0.0 (was rejected)."""
+    def test_parse_constr_rejected_in_v1(self):
+        """constr in program version 1.0.0 raises SyntaxError."""
         from uplc.tools import parse
-        prog = parse("(program 1.0.0 (constr 0))")
-        self.assertIsNotNone(prog)
+        with self.assertRaises(SyntaxError):
+            parse("(program 1.0.0 (constr 0))")
+
+    def test_parse_case_rejected_in_v1(self):
+        """case in program version 1.0.0 raises SyntaxError."""
+        from uplc.tools import parse
+        with self.assertRaises(SyntaxError):
+            parse("(program 1.0.0 (case (con integer 1)))")
 
     def test_parse_constr_in_v3(self):
-        """constr still works in 1.1.0."""
+        """constr works in 1.1.0."""
         from uplc.tools import parse
         prog = parse("(program 1.1.0 (constr 0))")
         self.assertIsNotNone(prog)
+
+    def test_parse_case_in_v3(self):
+        """case works in 1.1.0."""
+        from uplc.tools import parse
+        prog = parse("(program 1.1.0 (case (con bool True) (con integer 1) (con integer 0)))")
+        self.assertIsNotNone(prog)
+
+    def test_negative_constr_tag_rejected(self):
+        """Negative constructor tags raise SyntaxError."""
+        from uplc.tools import parse
+        with self.assertRaises((SyntaxError, AssertionError)):
+            parse("(program 1.1.0 (constr -5 (con integer 1)))")
 
 
 

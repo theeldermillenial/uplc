@@ -247,29 +247,52 @@ class Machine:
                     Constr(context.tag, resolved_fields),
                 )
         elif isinstance(context, FrameCases):
-            # Convert constant types to constr-like (tag, fields) for case scrutiny
+            # SOP (Sum-of-Products) case for constant types.
+            # Haskell ref: UntypedPlutusCore.Evaluation.Machine.Cek.Internal
+            #   caseOfSopConstant
+            #
+            # Each built-in type has a fixed number of constructors (n_ctors).
+            # If len(branches) > n_ctors → evaluation failure.
+            # If tag >= len(branches) → evaluation failure.
+            n_ctors = None
             if isinstance(value, Constr):
                 tag, fields = value.tag, value.fields
             elif isinstance(value, BuiltinBool):
-                # False=0, True=1, no fields
+                # SOP: False=0, True=1, no fields
+                n_ctors = 2
                 tag, fields = (1 if value.value else 0), []
             elif isinstance(value, BuiltinUnit):
-                # unit -> tag 0, no fields
+                # SOP: ()=0, no fields
+                n_ctors = 1
                 tag, fields = 0, []
+            elif isinstance(value, BuiltinInteger):
+                # SOP: integer N → tag N, no fields. Negative → failure.
+                if value.value < 0:
+                    raise RuntimeError("Negative integer in case scrutinee")
+                tag, fields = value.value, []
             elif isinstance(value, BuiltinPair):
-                # pair (l, r) -> tag 0, fields [l, r]
+                # SOP: (a,b)=0, fields [a, b]
+                n_ctors = 1
                 tag, fields = 0, [value.l_value, value.r_value]
             elif isinstance(value, BuiltinList):
-                # [] -> tag 0 (nil), [x, ...xs] -> tag 1 with fields [x, xs]
+                # SOP: Cons=0 (fields [head, tail]), Nil=1 (no fields)
+                # Note: reversed from Haskell ADT order — built-in list
+                # SOP puts Cons first per CIP-85/Plutus conformance suite.
+                n_ctors = 2
                 if len(value.values) == 0:
-                    tag, fields = 0, []
+                    tag, fields = 1, []
                 else:
-                    tag, fields = 1, [
+                    tag, fields = 0, [
                         value.values[0],
                         BuiltinList(list(value.values[1:]), value.sample_value),
                     ]
             else:
                 raise RuntimeError("Scrutinized non-constr in case")
+            if n_ctors is not None and len(context.branches) > n_ctors:
+                raise RuntimeError(
+                    f"Too many case branches: {len(context.branches)} "
+                    f"for type with {n_ctors} constructors"
+                )
             try:
                 branch = context.branches[tag]
             except IndexError as e:

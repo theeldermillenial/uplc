@@ -169,6 +169,10 @@ class Parser:
         )
         def constr_term(p):
             assert isinstance(p[2], int), "First value in constr must be an integer"
+            if p[2] < 0:
+                raise SyntaxError(
+                    f"Negative constructor tag {p[2]} is not allowed"
+                )
             return Constr(
                 p[2],
                 p[3],
