@@ -2172,3 +2172,21 @@ class TestParserTypeKeywords(unittest.TestCase):
         with self.assertRaises(Exception):
             parse("(program 1.0.0 (con boolean True))")
 
+        self.assertIn("expected a list", str(context.exception).lower())
+
+
+class TestVersionEnforcerRemoved(unittest.TestCase):
+    """Tests that case/constr parse in any program version."""
+
+    def test_parse_constr_in_v1(self):
+        """constr parses in program version 1.0.0 (was rejected)."""
+        from uplc.tools import parse
+        prog = parse("(program 1.0.0 (constr 0))")
+        self.assertIsNotNone(prog)
+
+    def test_parse_constr_in_v3(self):
+        """constr still works in 1.1.0."""
+        from uplc.tools import parse
+        prog = parse("(program 1.1.0 (constr 0))")
+        self.assertIsNotNone(prog)
+
