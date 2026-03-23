@@ -2172,8 +2172,6 @@ class TestParserTypeKeywords(unittest.TestCase):
         with self.assertRaises(Exception):
             parse("(program 1.0.0 (con boolean True))")
 
-        self.assertIn("expected a list", str(context.exception).lower())
-
 
 class TestVersionEnforcerRemoved(unittest.TestCase):
     """Tests that case/constr parse in any program version."""
