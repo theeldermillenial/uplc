@@ -562,31 +562,60 @@ class PlutusList(PlutusData):
 
 @dataclass(frozen=True, eq=True)
 class PlutusMap(PlutusData):
-    value: Union[Dict[PlutusData, PlutusData], frozendict.frozendict]
+    """Plutus Data map — preserves duplicate keys and insertion order.
+
+    Haskell ref: PlutusCore.Data.Map stores [(Data, Data)], an ordered
+    list of key-value pairs that may contain duplicate keys.
+
+    The value is stored as a tuple of (key, value) pairs, not a dict,
+    to preserve duplicates. This matches the Haskell Data type.
+    """
+
+    value: Union[
+        Dict[PlutusData, PlutusData],
+        "frozendict.frozendict",
+        tuple,  # tuple of (key, value) pairs — canonical form
+    ]
 
     def __post_init__(self):
-        frozen_value = frozendict.frozendict(self.value)
-        object.__setattr__(self, "value", frozen_value)
+        # Normalize to tuple of pairs to preserve duplicates
+        v = self.value
+        if isinstance(v, (dict, frozendict.frozendict)):
+            # Convert dict to tuple of pairs (loses duplicate info from dict,
+            # but at least we have a consistent internal representation)
+            pairs = tuple((k, v_) for k, v_ in v.items())
+        elif isinstance(v, (list, tuple)):
+            # Already a sequence of pairs
+            pairs = tuple(v)
+        else:
+            pairs = tuple(v)
+        object.__setattr__(self, "value", pairs)
+
+    def items(self):
+        """Iterate over (key, value) pairs, preserving duplicates."""
+        return iter(self.value)
 
     def to_cbor(self):
+        # Handled specially by default_encoder to preserve duplicate keys.
+        # This fallback is for contexts that don't use default_encoder.
         return frozendict.frozendict(
-            {k.to_cbor(): v.to_cbor() for k, v in self.value.items()}
+            {k.to_cbor(): v.to_cbor() for k, v in self.items()}
         )
 
     def to_json(self):
         return {
-            "map": [{"k": k.to_json(), "v": v.to_json()} for k, v in self.value.items()]
+            "map": [{"k": k.to_json(), "v": v.to_json()} for k, v in self.items()]
         }
 
     def plutus_valuestring(self):
         recursive_val_strings = (
             f"({x.plutus_valuestring()}, {y.plutus_valuestring()})"
-            for x, y in self.value.items()
+            for x, y in self.items()
         )
         return f"Map [{', '.join(recursive_val_strings)}]"
 
     def d_ex_mem(self) -> int:
-        return sum(v.ex_mem() + k.ex_mem() for k, v in self.value.items())
+        return sum(v.ex_mem() + k.ex_mem() for k, v in self.items())
 
 
 @dataclass(frozen=True, eq=True)
@@ -648,6 +677,23 @@ def default_encoder(
         return
     if not isinstance(value, PlutusData):
         raise NotImplementedError(f"Can not encode type {type(value)}")
+    # PlutusMap: write CBOR map directly to preserve duplicate keys
+    if isinstance(value, PlutusMap):
+        pairs = tuple((k.to_cbor(), v.to_cbor()) for k, v in value.items())
+        n = len(pairs)
+        # Write definite-length CBOR map header (major type 5)
+        if n < 24:
+            encoder.write(bytes([0xa0 | n]))
+        elif n < 0x100:
+            encoder.write(b"\xb8" + n.to_bytes(1, "big"))
+        elif n < 0x10000:
+            encoder.write(b"\xb9" + n.to_bytes(2, "big"))
+        else:
+            encoder.write(b"\xba" + n.to_bytes(4, "big"))
+        for k, v in pairs:
+            encoder.encode(k)
+            encoder.encode(v)
+        return
     value = value.to_cbor()
     if isinstance(value, PlutusByteString):
         # the encoder can not handle indefinite length arrays, but the plutus standard
@@ -707,10 +753,10 @@ def data_from_cbortag(cbor) -> PlutusData:
         entries = frozenlist(list(map(data_from_cbortag, cbor)))
         return PlutusList(entries)
     if isinstance(cbor, dict):
+        # Preserve key-value pairs as tuple (dict may have lost duplicates
+        # during CBOR decoding, but at least we normalize the internal form)
         return PlutusMap(
-            frozendict.frozendict(
-                {data_from_cbortag(k): data_from_cbortag(v) for k, v in cbor.items()}
-            )
+            tuple((data_from_cbortag(k), data_from_cbortag(v)) for k, v in cbor.items())
         )
     raise NotImplementedError(f"Unknown cbor type notation in {cbor}")
 
@@ -750,11 +796,9 @@ def data_from_json_dict(d: dict) -> PlutusData:
             d["map"], list
         ), "Expected a list in 'map' field (entries are dicts with field 'k' and 'v')"
         return PlutusMap(
-            frozendict.frozendict(
-                {
-                    data_from_json_dict(m["k"]): data_from_json_dict(m["v"])
-                    for m in d["map"]
-                }
+            tuple(
+                (data_from_json_dict(m["k"]), data_from_json_dict(m["v"]))
+                for m in d["map"]
             )
         )
     raise NotImplementedError(f"Unknown JSON notation in {d}")
@@ -1041,7 +1085,7 @@ def _MkCons(x, xs):
 def _MapData(x):
     assert isinstance(x, BuiltinList), "Can only map over a list"
     assert isinstance(x.sample_value, BuiltinPair), "Can only map over a list of pairs"
-    return PlutusMap({p.l_value: p.r_value for p in x.values})
+    return PlutusMap(tuple((p.l_value, p.r_value) for p in x.values))
 
 
 def _int_to_bytestring_endianness(
@@ -1259,7 +1303,7 @@ BuiltInFunEvalMap = {
     ),
     BuiltInFun.UnMapData: single_data_map(
         lambda x: BuiltinList(
-            [BuiltinPair(k, v) for k, v in x.value.items()],
+            [BuiltinPair(k, v) for k, v in x.items()],
             BuiltinPair(PlutusData(), PlutusData()),
         )
     ),

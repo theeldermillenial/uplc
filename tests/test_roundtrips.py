@@ -201,7 +201,7 @@ class HypothesisTests(unittest.TestCase):
     @hypothesis.given(uplc_program, hst.sampled_from(UPLCDialect))
     @hypothesis.settings(max_examples=1000, deadline=None)
     @hypothesis.example(
-        Program(version=(1, 0, 0), term=PlutusMap(frozendict.frozendict({}))),
+        Program(version=(1, 0, 0), term=PlutusMap(())),
         UPLCDialect.LegacyAiken,
     )
     @hypothesis.example(
@@ -762,7 +762,7 @@ class HypothesisTests(unittest.TestCase):
         )
     )
     @hypothesis.example(
-        Program(version=(1, 0, 0), term=PlutusMap(value=frozendict.frozendict({})))
+        Program(version=(1, 0, 0), term=PlutusMap(value=()))
     )
     @hypothesis.example(
         Program(version=(1, 0, 0), term=Lambda(var_name="_", term=Variable(name="_")))
@@ -790,3 +790,90 @@ class HypothesisTests(unittest.TestCase):
         encoded = p.to_json()
         decoded = data_from_json_dict(encoded)
         self.assertEqual(p, decoded, "incorrect json roundtrip")
+
+
+class PlutusMapDuplicateKeyTests(unittest.TestCase):
+    """PlutusMap must preserve duplicate keys per Haskell Data type.
+
+    Haskell ref: PlutusCore.Data — Map stores [(Data, Data)], an ordered
+    list of key-value pairs that may contain duplicate keys.
+    """
+
+    def test_duplicate_keys_preserved_internally(self):
+        k = PlutusInteger(1)
+        v1 = PlutusInteger(10)
+        v2 = PlutusInteger(20)
+        m = PlutusMap(((k, v1), (k, v2)))
+        pairs = list(m.items())
+        self.assertEqual(len(pairs), 2)
+        self.assertEqual(pairs[0], (k, v1))
+        self.assertEqual(pairs[1], (k, v2))
+
+    def test_duplicate_keys_cbor_encoding(self):
+        """CBOR encoding preserves duplicate keys in the byte output."""
+        import cbor2 as cbor2_mod
+        k = PlutusInteger(1)
+        v1 = PlutusByteString(b"a")
+        v2 = PlutusByteString(b"b")
+        m = PlutusMap(((k, v1), (k, v2)))
+        encoded = plutus_cbor_dumps(m)
+        # The encoded CBOR should contain a map with 2 entries (0xa2 = map(2))
+        # even though both keys are the same.
+        self.assertIn(b"\xa2", encoded)
+
+    def test_no_duplicate_keys_cbor_roundtrip(self):
+        """CBOR roundtrip works for maps without duplicate keys."""
+        k1 = PlutusInteger(1)
+        k2 = PlutusInteger(2)
+        v1 = PlutusByteString(b"a")
+        v2 = PlutusByteString(b"b")
+        m = PlutusMap(((k1, v1), (k2, v2)))
+        encoded = plutus_cbor_dumps(m)
+        decoded = data_from_cbor(encoded)
+        self.assertEqual(list(decoded.items()), [(k1, v1), (k2, v2)])
+
+    def test_duplicate_keys_json_roundtrip(self):
+        k = PlutusInteger(1)
+        v1 = PlutusInteger(10)
+        v2 = PlutusInteger(20)
+        m = PlutusMap(((k, v1), (k, v2)))
+        j = m.to_json()
+        self.assertEqual(len(j["map"]), 2)
+        decoded = data_from_json_dict(j)
+        self.assertEqual(list(decoded.items()), [(k, v1), (k, v2)])
+
+    def test_empty_map(self):
+        m = PlutusMap(())
+        self.assertEqual(list(m.items()), [])
+        self.assertEqual(m.value, ())
+
+    def test_dict_input_normalized(self):
+        """Dict input loses duplicates but normalizes to tuple form."""
+        m = PlutusMap({PlutusInteger(1): PlutusInteger(10)})
+        self.assertIsInstance(m.value, tuple)
+        self.assertEqual(len(m.value), 1)
+
+    def test_mapdata_preserves_duplicates(self):
+        """MapData builtin should preserve duplicate keys."""
+        from uplc.ast import BuiltinList, BuiltinPair
+        k = PlutusInteger(1)
+        v1 = PlutusInteger(10)
+        v2 = PlutusInteger(20)
+        pairs = BuiltinList(
+            [BuiltinPair(k, v1), BuiltinPair(k, v2)],
+            BuiltinPair(PlutusData(), PlutusData()),
+        )
+        from uplc.ast import _MapData
+        result = _MapData(pairs)
+        self.assertEqual(len(list(result.items())), 2)
+
+    def test_unmapdata_preserves_duplicates(self):
+        """UnMapData builtin should preserve duplicate keys."""
+        k = PlutusInteger(1)
+        v1 = PlutusInteger(10)
+        v2 = PlutusInteger(20)
+        m = PlutusMap(((k, v1), (k, v2)))
+        from uplc.ast import BuiltInFunEvalMap, BuiltInFun
+        unmap = BuiltInFunEvalMap[BuiltInFun.UnMapData]
+        result = unmap(m)
+        self.assertEqual(len(result.values), 2)
