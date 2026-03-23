@@ -2095,16 +2095,38 @@ class TestMiscBugfixes(unittest.TestCase):
 
 
 class TestTypeCoercionAndCase(unittest.TestCase):
-    """Tests for type coercion in constants and case on non-Constr values."""
+    """Tests for constant parsing and case on non-Constr values.
+
+    Haskell ref: PlutusCore/Parser/Builtin.hs
+    - conBool (line 76): only accepts 'True' or 'False' keywords
+    - conUnit (line 71): only accepts '(' ')' literal
+    - conInteger (line 48): only accepts signed decimal via Lex.decimal
+
+    The declared type selects a specific value parser. No coercion.
+    See also: PlutusCore/Parser/Type.hs lines 137-160 for type keywords.
+
+    Case on non-Constr constants confirmed by Plutus conformance suite:
+    - vendor/plutus/plutus-conformance/test-cases/uplc/evaluation/term/constant-case/
+    - integer-02: case on integer succeeds (selects branch by tag)
+    - bool-*: case on bool succeeds (False=tag 0, True=tag 1)
+    """
 
     def test_bool_rejects_int(self):
-        """(con bool 0) is a parse error — only True/False accepted."""
+        """(con bool 0) is a parse error — only True/False accepted.
+
+        Haskell ref: conBool in PlutusCore/Parser/Builtin.hs line 76
+        uses: choice [True <$ symbol "True", False <$ symbol "False"]
+        """
         from uplc.tools import parse
         with self.assertRaises(Exception):
             parse("(program 1.0.0 (con bool 0))")
 
     def test_unit_only_accepts_parens(self):
-        """(con unit ()) parses but (con unit 0) does not."""
+        """(con unit ()) parses but (con unit 0) does not.
+
+        Haskell ref: conUnit in PlutusCore/Parser/Builtin.hs line 71
+        uses: void (symbol "(" *> symbol ")")
+        """
         from uplc.tools import parse
         prog = parse("(program 1.0.0 (con unit ()))")
         self.assertIsNotNone(prog)
