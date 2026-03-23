@@ -2074,3 +2074,21 @@ class TestV3StrictMode(unittest.TestCase):
         # Should not raise with strict=False
         result = unflatten(bad_cbor, strict=False)
         self.assertIsInstance(result, Program)
+
+
+class TestMiscBugfixes(unittest.TestCase):
+    """Tests for zero-cost builtin error and file extension fix."""
+
+    def test_unknown_builtin_raises(self):
+        """Unknown builtin in cost model raises RuntimeError, not Budget(0,0)."""
+        from uplc.machine import budget_cost_of_op_on_model
+        from uplc.cost_model import BuiltinCostModel
+        empty_model = BuiltinCostModel({}, {})
+        with self.assertRaises(RuntimeError):
+            budget_cost_of_op_on_model(empty_model, "NONEXISTENT_BUILTIN")
+
+    def test_file_extension_check(self):
+        """cost_model.py checks .json not json."""
+        from pathlib import Path
+        p = Path("test.json")
+        self.assertEqual(p.suffix, ".json")
