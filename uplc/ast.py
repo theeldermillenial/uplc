@@ -1480,11 +1480,24 @@ class BoundStateLambda(AST):
     state: frozendict.frozendict
     _fields = ["term"]
 
+    def discharge(self) -> "Lambda":
+        """Substitute captured state into the body, producing a plain Lambda.
+
+        Haskell ref: the CEK machine discharges the environment when
+        returning a closure as a final result. This substitutes each
+        bound variable in the state into the term body.
+        """
+        from .optimizer.pre_apply_args import Substitute
+
+        body = self.term
+        for var_name, value in self.state.items():
+            body = Substitute(var_name, value).visit(body)
+        return Lambda(self.var_name, body)
+
     def dumps(self, dialect=UPLCDialect.Plutus) -> str:
-        s = f"(lam {self.var_name} {self.term.dumps(dialect=dialect)})"
-        for k, v in reversed(self.state.items()):
-            s = f"[(lam {k} {s}) {v.dumps(dialect=dialect)}]"
-        return s
+        if self.state:
+            return self.discharge().dumps(dialect=dialect)
+        return f"(lam {self.var_name} {self.term.dumps(dialect=dialect)})"
 
     def ex_mem(self) -> int:
         return 1
@@ -1505,11 +1518,19 @@ class BoundStateDelay(AST):
     state: frozendict.frozendict
     _fields = ["term"]
 
+    def discharge(self) -> "Delay":
+        """Substitute captured state into the body, producing a plain Delay."""
+        from .optimizer.pre_apply_args import Substitute
+
+        body = self.term
+        for var_name, value in self.state.items():
+            body = Substitute(var_name, value).visit(body)
+        return Delay(body)
+
     def dumps(self, dialect=UPLCDialect.Plutus) -> str:
-        s = f"(delay {self.term.dumps(dialect=dialect)})"
-        for k, v in reversed(self.state.items()):
-            s = f"[(lam {k} {s}) {v.dumps(dialect=dialect)}]"
-        return s
+        if self.state:
+            return self.discharge().dumps(dialect=dialect)
+        return f"(delay {self.term.dumps(dialect=dialect)})"
 
     def ex_mem(self) -> int:
         return 1
