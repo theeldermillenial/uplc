@@ -1007,7 +1007,9 @@ def verify_schnorr_secp256k1(
     pk: BuiltinByteString, m: BuiltinByteString, s: BuiltinByteString
 ):
     if pysecp256k1 is None:
-        _LOGGER.error("libsecp256k1 is not installed. Schnorr verification will not work")
+        _LOGGER.error(
+            "libsecp256k1 is not installed. Schnorr verification will not work"
+        )
         raise RuntimeError("Schnorr not supported")
     if schnorrsig is None:
         _LOGGER.error(

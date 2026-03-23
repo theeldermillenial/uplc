@@ -15,29 +15,29 @@ from .ast import (
 )
 
 _HASKELL_ESCAPE_RE = re.compile(
-    r'\\(?:'
-    r'o([0-7]+)'              # group 1: \oOOO octal
-    r'|x([0-9a-fA-F]{2})'    # group 2: \xHH hex (exactly 2 digits)
-    r'|u([0-9a-fA-F]{4})'  # group 3: \uHHHH unicode (4 hex digits)
-    r'|U([0-9a-fA-F]{8})'  # group 4: \UHHHHHHHH unicode (8 hex digits)
-    r'|(\d+)'              # group 5: \DDD decimal
-    r'|([\\\"\'abfnrtv&])' # group 6: single-char escapes
-    r')'
+    r"\\(?:"
+    r"o([0-7]+)"  # group 1: \oOOO octal
+    r"|x([0-9a-fA-F]{2})"  # group 2: \xHH hex (exactly 2 digits)
+    r"|u([0-9a-fA-F]{4})"  # group 3: \uHHHH unicode (4 hex digits)
+    r"|U([0-9a-fA-F]{8})"  # group 4: \UHHHHHHHH unicode (8 hex digits)
+    r"|(\d+)"  # group 5: \DDD decimal
+    r"|([\\\"\'abfnrtv&])"  # group 6: single-char escapes
+    r")"
 )
 
 # Standard single-character Haskell/Python escapes
 _SIMPLE_ESCAPES = {
-    '\\': '\\',
+    "\\": "\\",
     '"': '"',
     "'": "'",
-    'a': '\a',
-    'b': '\b',
-    'f': '\f',
-    'n': '\n',
-    'r': '\r',
-    't': '\t',
-    'v': '\v',
-    '&': '',  # Haskell's \& is a null-width escape (empty string)
+    "a": "\a",
+    "b": "\b",
+    "f": "\f",
+    "n": "\n",
+    "r": "\r",
+    "t": "\t",
+    "v": "\v",
+    "&": "",  # Haskell's \& is a null-width escape (empty string)
 }
 
 
@@ -47,6 +47,7 @@ def _decode_haskell_string(s: str) -> str:
     Handles all escape sequences: \\n, \\t, \\\\, \\", \\xHH (hex),
     \\DDD (decimal), and \\oOOO (octal).
     """
+
     def replace_escape(m):
         if m.group(1) is not None:  # \oOOO octal
             return chr(int(m.group(1), 8))
@@ -61,6 +62,7 @@ def _decode_haskell_string(s: str) -> str:
         if m.group(6) is not None:  # single-char escape
             return _SIMPLE_ESCAPES[m.group(6)]
         return m.group(0)  # fallback: leave as-is
+
     return _HASKELL_ESCAPE_RE.sub(replace_escape, s)
 
 
@@ -202,8 +204,6 @@ class Parser:
                 return ast.BuiltinUnit()
             if name == "data":
                 return ast.PlutusData()
-            if name == "boolean":
-                return ast.BuiltinBool(False)
             if name == "array":
                 return ast.BuiltinList([], ast.PlutusData())  # default element type
             raise SyntaxError(f"Unknown builtin type {name}")
@@ -496,7 +496,7 @@ def wrap_builtin_type(typ: ast.Constant, val):
             wrap_builtin_type(typ.r_value, val[1]),
         )
     if isinstance(typ, ast.BuiltinUnit):
-        # Accept None (from "()" literal) or int (from number literal) — value is ignored
+        assert val is None, f"Expected () but found {type(val)}"
         return ast.BuiltinUnit()
     if isinstance(typ, ast.BuiltinByteString):
         assert isinstance(val, bytes), f"Expected bytes but found {type(val)}"
@@ -511,12 +511,7 @@ def wrap_builtin_type(typ: ast.Constant, val):
     if isinstance(typ, ast.BuiltinString):
         assert isinstance(val, str), f"Expected str but found {type(val)}"
     if isinstance(typ, ast.BuiltinInteger):
-        if isinstance(val, bytes):
-            val = int.from_bytes(val, "big", signed=False)
         assert isinstance(val, int), f"Expected int but found {type(val)}"
     if isinstance(typ, ast.BuiltinBool):
-        # Accept int as bool: 0=False, nonzero=True (conformance suite uses (con bool 0))
-        if isinstance(val, int) and not isinstance(val, bool):
-            val = val != 0
         assert isinstance(val, bool), f"Expected bool but found {type(val)}"
     return typ.__class__(val)

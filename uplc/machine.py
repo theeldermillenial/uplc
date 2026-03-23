@@ -256,9 +256,6 @@ class Machine:
             elif isinstance(value, BuiltinUnit):
                 # unit -> tag 0, no fields
                 tag, fields = 0, []
-            elif isinstance(value, BuiltinInteger):
-                # integer N -> tag N, no fields
-                tag, fields = value.value, []
             elif isinstance(value, BuiltinPair):
                 # pair (l, r) -> tag 0, fields [l, r]
                 tag, fields = 0, [value.l_value, value.r_value]
