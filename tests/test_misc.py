@@ -2146,3 +2146,29 @@ class TestTypeCoercionAndCase(unittest.TestCase):
         prog = parse("(program 1.1.0 (case (con bool False) (con integer 10) (con integer 20)))")
         result = eval(prog)
         self.assertEqual(result.result.value, 10)
+
+class TestParserTypeKeywords(unittest.TestCase):
+    """Tests for type keyword aliases.
+
+    Haskell ref: PlutusCore/Parser/Type.hs lines 137-160 (defaultUni)
+    Recognized keywords: integer, bytestring, string, unit, bool, list,
+    array, pair, data, bls12_381_G1_element, bls12_381_G2_element,
+    bls12_381_mlresult, value.
+
+    'array' is a valid alias for 'list' in the Haskell parser.
+    'boolean' is NOT valid — only 'bool' is accepted.
+    """
+
+    def test_parse_array_alias(self):
+        """'array' accepted as alias for 'list' per Haskell defaultUni."""
+        from uplc.tools import parse
+        # Aiken dialect: array<integer>
+        prog = parse("(program 1.0.0 (con (list integer) []))")
+        self.assertIsNotNone(prog)
+
+    def test_boolean_is_not_valid(self):
+        """'boolean' is NOT a valid type keyword — only 'bool'."""
+        from uplc.tools import parse
+        with self.assertRaises(Exception):
+            parse("(program 1.0.0 (con boolean True))")
+

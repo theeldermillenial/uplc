@@ -208,7 +208,7 @@ class Parser:
         def constanttype(p):
             # the Aiken dialect
             name = p[0].value
-            if name == "list":
+            if name == "list" or name == "array":
                 return ast.BuiltinList([], p[2])
             raise SyntaxError(f"Unknown builtin type {name}")
 
@@ -216,7 +216,7 @@ class Parser:
         def constanttype(p):
             # the Plutus dialect
             name = p[1].value
-            if name == "list":
+            if name == "list" or name == "array":
                 return ast.BuiltinList([], p[2])
             raise SyntaxError(f"Unknown builtin type {name}")
 
