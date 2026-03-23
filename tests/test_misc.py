@@ -2097,23 +2097,19 @@ class TestMiscBugfixes(unittest.TestCase):
 class TestTypeCoercionAndCase(unittest.TestCase):
     """Tests for type coercion in constants and case on non-Constr values."""
 
-    def test_int_as_bool_false(self):
-        """(con bool 0) parses as False."""
+    def test_bool_rejects_int(self):
+        """(con bool 0) is a parse error — only True/False accepted."""
         from uplc.tools import parse
-        prog = parse("(program 1.0.0 (con bool 0))")
-        self.assertIsNotNone(prog)
+        with self.assertRaises(Exception):
+            parse("(program 1.0.0 (con bool 0))")
 
-    def test_int_as_bool_true(self):
-        """(con bool 1) parses as True."""
-        from uplc.tools import parse
-        prog = parse("(program 1.0.0 (con bool 1))")
-        self.assertIsNotNone(prog)
-
-    def test_unit_accepts_int(self):
-        """(con unit 0) parses (value ignored for unit)."""
+    def test_unit_only_accepts_parens(self):
+        """(con unit ()) parses but (con unit 0) does not."""
         from uplc.tools import parse
         prog = parse("(program 1.0.0 (con unit ()))")
         self.assertIsNotNone(prog)
+        with self.assertRaises(Exception):
+            parse("(program 1.0.0 (con unit 0))")
 
     def test_case_on_bool_true(self):
         """case on True selects branch 1."""
